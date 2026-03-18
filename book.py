@@ -99,16 +99,20 @@ def fetch_courses(session: requests.Session, target_date: datetime) -> list:
     return courses
 
 
-def find_course(courses: list, name: str, hour: int) -> dict | None:
-    """Sucht den Kurs anhand von Name und Uhrzeit – bookable-Flag ignoriert."""
+_ALREADY_BOOKED = object()  # Sentinel: bereits gebucht → kein Fehler
+
+
+def find_course(courses: list, name: str, hour: int):
+    """Sucht den Kurs anhand von Name und Uhrzeit – bookable-Flag ignoriert.
+    Gibt _ALREADY_BOOKED zurück wenn der Kurs bereits gebucht ist."""
     for c in courses:
         if name.lower() not in c.get("name", "").lower():
             continue
         for slot in c.get("slots", []):
             if f"T{hour:02d}:" in slot.get("startDateTime", ""):
                 if slot.get("alreadyBooked"):
-                    log.info("Kurs '%s' um %d:00 bereits gebucht – nichts zu tun.", name, hour)
-                    return None
+                    log.info("Kurs '%s' um %d:00 bereits gebucht – wird übersprungen.", name, hour)
+                    return _ALREADY_BOOKED
                 return c
     return None
 
@@ -171,7 +175,10 @@ def main():
             courses = fetch_courses(session, target)
             course = find_course(courses, COURSE_NAME, COURSE_HOUR)
 
-            if not course:
+            if course is _ALREADY_BOOKED:
+                sys.exit(0)
+
+            if course is None:
                 log.error(
                     "Kurs '%s' um %d:00 Uhr am %s nicht gefunden.",
                     COURSE_NAME,
