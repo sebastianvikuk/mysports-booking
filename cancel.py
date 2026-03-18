@@ -64,26 +64,12 @@ def login(session: requests.Session) -> None:
 
 
 def cancel_course(session: requests.Session, course_id: str) -> None:
-    payload = {
-        "courseAppointmentId": int(course_id),
-        "expectedCustomerStatus": "CANCELLED",
-    }
+    """DELETE /v1/aggregated/calendaritems/{tenant}:{id}"""
     log.info("Storniere Kurs ID %s ...", course_id)
-    resp = session.post(
-        f"{BASE_URL}/nox/v1/calendar/cancelcourse",
-        headers=HEADERS,
-        json=payload,
-    )
-    if not resp.ok:
-        # Fallback: bookcourse-Endpoint mit CANCELLED Status versuchen
-        log.warning("cancelcourse fehlgeschlagen (%s), versuche bookcourse ...", resp.status_code)
-        resp = session.post(
-            f"{BASE_URL}/nox/v1/calendar/bookcourse",
-            headers=HEADERS,
-            json=payload,
-        )
+    url = f"{BASE_URL}/v1/aggregated/calendaritems/{TENANT}:{course_id}"
+    resp = session.delete(url, headers=HEADERS)
     resp.raise_for_status()
-    log.info("Stornierung erfolgreich: %s", resp.json())
+    log.info("Stornierung erfolgreich (Status %s)", resp.status_code)
 
 
 def main():
