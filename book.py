@@ -106,6 +106,9 @@ def find_course(courses: list, name: str, hour: int) -> dict | None:
             continue
         for slot in c.get("slots", []):
             if f"T{hour:02d}:" in slot.get("startDateTime", ""):
+                if slot.get("alreadyBooked"):
+                    log.info("Kurs '%s' um %d:00 bereits gebucht – nichts zu tun.", name, hour)
+                    return None
                 return c
     return None
 

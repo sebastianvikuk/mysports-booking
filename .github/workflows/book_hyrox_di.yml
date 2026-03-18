@@ -2,9 +2,8 @@ name: Hyrox Training – Dienstag buchen
 
 on:
   schedule:
-    # Dienstag 18:01 MESZ (UTC+2) = 16:01 UTC
-    # Im Winter (MEZ/UTC+1): läuft 17:01 MEZ (1h nach Öffnung – noch buchbar)
-    - cron: '1 16 * * 2'
+    - cron: '1 17 * * 2'   # Winter MEZ  (UTC+1): 18:01 MEZ = 17:01 UTC
+    - cron: '1 16 * * 2'   # Sommer MESZ (UTC+2): 18:01 MESZ = 16:01 UTC
   workflow_dispatch:
 
 jobs:

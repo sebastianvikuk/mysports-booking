@@ -2,8 +2,8 @@ name: Pilates – Mittwoch buchen
 
 on:
   schedule:
-    # Mittwoch 18:31 MESZ (UTC+2) = 16:31 UTC
-    - cron: '31 16 * * 3'
+    - cron: '31 17 * * 3'  # Winter MEZ  (UTC+1): 18:31 MEZ = 17:31 UTC
+    - cron: '31 16 * * 3'  # Sommer MESZ (UTC+2): 18:31 MESZ = 16:31 UTC
   workflow_dispatch:
 
 jobs:

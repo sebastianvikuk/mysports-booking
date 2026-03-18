@@ -2,8 +2,8 @@ name: Hyrox Training – Samstag buchen
 
 on:
   schedule:
-    # Samstag 9:01 MESZ (UTC+2) = 7:01 UTC
-    - cron: '1 7 * * 6'
+    - cron: '1 8 * * 6'   # Winter MEZ  (UTC+1): 9:01 MEZ = 8:01 UTC
+    - cron: '1 7 * * 6'   # Sommer MESZ (UTC+2): 9:01 MESZ = 7:01 UTC
   workflow_dispatch:
 
 jobs:
