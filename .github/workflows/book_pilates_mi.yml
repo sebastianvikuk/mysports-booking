@@ -1,0 +1,27 @@
+name: Pilates – Mittwoch buchen
+
+on:
+  schedule:
+    # Mittwoch 18:31 MESZ (UTC+2) = 16:31 UTC
+    - cron: '31 16 * * 3'
+  workflow_dispatch:
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+    env:
+      MYSPORTS_EMAIL:    ${{ secrets.MYSPORTS_EMAIL }}
+      MYSPORTS_PASSWORD: ${{ secrets.MYSPORTS_PASSWORD }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      NOTIFY_EMAIL:      ${{ secrets.MYSPORTS_EMAIL }}
+      COURSE_NAME:       "Pilates"
+      COURSE_WEEKDAY:    "2"
+      COURSE_HOUR:       "18"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests python-dotenv
+      - name: Kurs buchen
+        run: python book.py

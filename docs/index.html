@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kurs stornieren</title>
+  <style>
+    body { font-family: sans-serif; max-width: 420px; margin: 60px auto;
+           padding: 0 20px; text-align: center; color: #333; }
+    h2   { color: #d32f2f; }
+    .btn { display: inline-block; margin: 10px; padding: 14px 32px;
+           border: none; border-radius: 6px; font-size: 1em;
+           font-weight: bold; cursor: pointer; text-decoration: none; }
+    .cancel { background: #d32f2f; color: white; }
+    .back   { background: #eee; color: #333; }
+    #status { margin-top: 20px; font-size: 1em; }
+  </style>
+</head>
+<body>
+  <h2>❌ Kurs stornieren</h2>
+  <p id="info">Bitte warten …</p>
+  <div id="actions" style="display:none">
+    <button class="btn cancel" onclick="doCancel()">Jetzt stornieren</button>
+    <a class="btn back" href="https://www.mysports.com">Abbrechen</a>
+  </div>
+  <div id="status"></div>
+
+<script>
+const params  = new URLSearchParams(location.search);
+const courseId = params.get("cancel");
+const pat      = params.get("pat");
+const repo     = params.get("repo") || "sebastianvikuk/mysports-booking";
+
+if (!courseId || !pat) {
+  document.getElementById("info").textContent = "Ungültiger Link.";
+} else {
+  document.getElementById("info").innerHTML =
+    `Kurs-ID: <strong>${courseId}</strong><br>Möchtest du diesen Kurs wirklich stornieren?`;
+  document.getElementById("actions").style.display = "block";
+}
+
+async function doCancel() {
+  document.getElementById("actions").innerHTML = "";
+  document.getElementById("status").textContent = "Wird storniert …";
+
+  const url = `https://api.github.com/repos/${repo}/actions/workflows/cancel.yml/dispatches`;
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${pat}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ref: "main",
+        inputs: { course_appointment_id: courseId }
+      }),
+    });
+    if (resp.status === 204) {
+      document.getElementById("status").innerHTML =
+        "✅ <strong>Stornierung gestartet!</strong><br>Du erhältst in ~1 Minute eine Bestätigung.";
+    } else {
+      const err = await resp.text();
+      document.getElementById("status").textContent = "Fehler: " + resp.status + " – " + err;
+    }
+  } catch (e) {
+    document.getElementById("status").textContent = "Netzwerkfehler: " + e.message;
+  }
+}
+</script>
+</body>
+</html>

@@ -100,14 +100,12 @@ def fetch_courses(session: requests.Session, target_date: datetime) -> list:
 
 
 def find_course(courses: list, name: str, hour: int) -> dict | None:
-    """Sucht den Kurs anhand von Name und Uhrzeit (via slots[].startDateTime)."""
+    """Sucht den Kurs anhand von Name und Uhrzeit – bookable-Flag ignoriert."""
     for c in courses:
-        course_name = c.get("name", "")
-        if name.lower() not in course_name.lower():
+        if name.lower() not in c.get("name", "").lower():
             continue
         for slot in c.get("slots", []):
-            start = slot.get("startDateTime", "")
-            if f"T{hour:02d}:" in start and slot.get("bookable"):
+            if f"T{hour:02d}:" in slot.get("startDateTime", ""):
                 return c
     return None
 

@@ -1,0 +1,27 @@
+name: Hyrox Training – Samstag buchen
+
+on:
+  schedule:
+    # Samstag 9:01 MESZ (UTC+2) = 7:01 UTC
+    - cron: '1 7 * * 6'
+  workflow_dispatch:
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+    env:
+      MYSPORTS_EMAIL:    ${{ secrets.MYSPORTS_EMAIL }}
+      MYSPORTS_PASSWORD: ${{ secrets.MYSPORTS_PASSWORD }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      NOTIFY_EMAIL:      ${{ secrets.MYSPORTS_EMAIL }}
+      COURSE_NAME:       "Hyrox Training"
+      COURSE_WEEKDAY:    "5"
+      COURSE_HOUR:       "9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests python-dotenv
+      - name: Kurs buchen
+        run: python book.py

@@ -1,0 +1,29 @@
+name: Reminder – Hyrox Training Samstag
+
+on:
+  schedule:
+    # Freitag 18:00 MESZ = 16:00 UTC (1 Tag vor Samstag-Kurs)
+    - cron: '0 16 * * 5'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    env:
+      MYSPORTS_EMAIL:    ${{ secrets.MYSPORTS_EMAIL }}
+      MYSPORTS_PASSWORD: ${{ secrets.MYSPORTS_PASSWORD }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      NOTIFY_EMAIL:      ${{ secrets.MYSPORTS_EMAIL }}
+      GITHUB_REPO:       "sebastianvikuk/mysports-booking"
+      CANCEL_PAT:        ${{ secrets.CANCEL_PAT }}
+      COURSE_NAME:       "Hyrox Training"
+      COURSE_WEEKDAY:    "5"
+      COURSE_HOUR:       "9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests python-dotenv
+      - name: Reminder senden
+        run: python remind.py

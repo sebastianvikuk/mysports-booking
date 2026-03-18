@@ -1,0 +1,27 @@
+name: Kurs stornieren
+
+on:
+  workflow_dispatch:
+    inputs:
+      course_appointment_id:
+        description: "Kurs-ID (courseAppointmentId)"
+        required: true
+        type: string
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    env:
+      MYSPORTS_EMAIL:         ${{ secrets.MYSPORTS_EMAIL }}
+      MYSPORTS_PASSWORD:      ${{ secrets.MYSPORTS_PASSWORD }}
+      SMTP_APP_PASSWORD:      ${{ secrets.SMTP_APP_PASSWORD }}
+      NOTIFY_EMAIL:           ${{ secrets.MYSPORTS_EMAIL }}
+      COURSE_APPOINTMENT_ID:  ${{ inputs.course_appointment_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests python-dotenv
+      - name: Kurs stornieren
+        run: python cancel.py
