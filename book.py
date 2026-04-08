@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 MySports Kurs-Automatisierung
-Bucht jeden Dienstag um 18:01 Uhr den Kurs fuer den naechsten Dienstag.
+Bucht jeden Dienstag um 18:00 Uhr den Kurs fuer den naechsten Dienstag.
+Versucht bis zu 3x, falls der Kurs noch nicht buchbar ist.
 
 Cron-Eintrag (Mac):
-  1 18 * * 2 cd /Users/g441227/Library/CloudStorage/OneDrive-Allianz(2)/programming/mysports-booking && .venv/bin/python3 book.py >> /tmp/mysports.log 2>&1
+  0 18 * * 2 cd /Users/g441227/Library/CloudStorage/OneDrive-Allianz(2)/programming/mysports-booking && .venv/bin/python3 book.py >> /tmp/mysports.log 2>&1
 """
 
 import base64
@@ -13,6 +14,7 @@ import logging
 import os
 import smtplib
 import sys
+import time
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 
@@ -160,47 +162,92 @@ def send_notification(course_name: str, start: str) -> None:
 
 # ── Hauptprogramm ──────────────────────────────────────────────────────────
 
+def try_booking(session: requests.Session, target: datetime) -> tuple[bool, bool]:
+    """
+    Versucht eine Buchung durchzuführen.
+
+    Returns:
+        (success, should_retry):
+            success=True wenn Buchung erfolgreich oder bereits gebucht
+            should_retry=True wenn ein erneuter Versuch sinnvoll ist
+    """
+    try:
+        courses = fetch_courses(session, target)
+        course = find_course(courses, COURSE_NAME, COURSE_HOUR)
+
+        if course is _ALREADY_BOOKED:
+            return (True, False)  # Bereits gebucht – kein Retry nötig
+
+        if course is None:
+            log.warning(
+                "Kurs '%s' um %d:00 Uhr am %s noch nicht gefunden (evtl. noch nicht freigeschaltet).",
+                COURSE_NAME,
+                COURSE_HOUR,
+                target.strftime("%d.%m.%Y"),
+            )
+            return (False, True)  # Noch nicht gefunden – Retry sinnvoll
+
+        log.info("Kurs gefunden: %s (ID %s)", course.get("name"), course.get("id"))
+        book_course(session, course)
+        slot_start = course["slots"][0]["startDateTime"][:16].replace("T", " ")
+        send_notification(course.get("name", COURSE_NAME), slot_start)
+        return (True, False)  # Erfolgreich gebucht
+
+    except requests.HTTPError as e:
+        error_text = e.response.text
+        log.error("HTTP-Fehler: %s – %s", e.response.status_code, error_text[:300])
+
+        # Prüfe auf "Warteliste voll" oder andere finale Fehler
+        if "max.waiting.list.reached" in error_text or "already.booked" in error_text:
+            return (False, False)  # Finale Fehler – kein Retry
+
+        # Bei anderen HTTP-Fehlern könnte ein Retry helfen
+        return (False, True)
+
+    except Exception as e:
+        log.error("Fehler: %s", e)
+        return (False, False)  # Unerwarteter Fehler – kein Retry
+
+
 def main():
     target = next_weekday(COURSE_WEEKDAY)
     log.info(
-        "Starte Buchung: '%s' am %s um %d:00 Uhr",
+        "Starte Buchung: '%s' am %s um %d:00 Uhr (max. 3 Versuche)",
         COURSE_NAME,
         target.strftime("%d.%m.%Y"),
         COURSE_HOUR,
     )
 
+    max_attempts = 3
+    retry_delay = 10  # Sekunden zwischen Versuchen
+
     with requests.Session() as session:
         try:
             login(session)
-            courses = fetch_courses(session, target)
-            course = find_course(courses, COURSE_NAME, COURSE_HOUR)
 
-            if course is _ALREADY_BOOKED:
-                sys.exit(0)
+            for attempt in range(1, max_attempts + 1):
+                log.info("Versuch %d von %d", attempt, max_attempts)
+                success, should_retry = try_booking(session, target)
 
-            if course is None:
-                log.error(
-                    "Kurs '%s' um %d:00 Uhr am %s nicht gefunden.",
-                    COURSE_NAME,
-                    COURSE_HOUR,
-                    target.strftime("%d.%m.%Y"),
-                )
-                log.info(
-                    "Verfügbare Kurse: %s",
-                    [f"{c.get('name')} {c['slots'][0]['startDateTime'][11:16]}" for c in courses],
-                )
-                sys.exit(1)
+                if success:
+                    log.info("Buchung erfolgreich abgeschlossen!")
+                    sys.exit(0)
 
-            log.info("Kurs gefunden: %s (ID %s)", course.get("name"), course.get("id"))
-            book_course(session, course)
-            slot_start = course["slots"][0]["startDateTime"][:16].replace("T", " ")
-            send_notification(course.get("name", COURSE_NAME), slot_start)
+                if not should_retry:
+                    log.error("Buchung fehlgeschlagen – kein erneuter Versuch möglich.")
+                    sys.exit(1)
 
-        except requests.HTTPError as e:
-            log.error("HTTP-Fehler: %s – %s", e.response.status_code, e.response.text[:300])
+                # Noch nicht erfolgreich, aber Retry sinnvoll
+                if attempt < max_attempts:
+                    log.info("Warte %d Sekunden vor erneutem Versuch...", retry_delay)
+                    time.sleep(retry_delay)
+
+            # Alle Versuche aufgebraucht
+            log.error("Alle %d Versuche fehlgeschlagen.", max_attempts)
             sys.exit(1)
+
         except Exception as e:
-            log.error("Fehler: %s", e)
+            log.error("Kritischer Fehler: %s", e)
             sys.exit(1)
 
 
