@@ -17,15 +17,31 @@ import sys
 import time
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
+from io import StringIO
 
 import requests
 from dotenv import load_dotenv
 
 # ── Logging ────────────────────────────────────────────────────────────────
+# Log-Handler für StringIO (sammelt alle Logs)
+log_stream = StringIO()
+stream_handler = logging.StreamHandler(log_stream)
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s  %(levelname)s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+)
+
+# Konsolen-Handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter("%(asctime)s  %(levelname)s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+)
+
+# Root-Logger konfigurieren
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s  %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[console_handler, stream_handler]
 )
 log = logging.getLogger(__name__)
 
@@ -140,13 +156,19 @@ def book_course(session: requests.Session, course: dict) -> bool:
     return True
 
 
-def send_notification(course_name: str, start: str) -> None:
+def send_notification(course_name: str, start: str, include_logs: bool = True) -> None:
     """Sendet eine Bestaetigungs-Mail via Gmail SMTP."""
     if not SMTP_APP_PASS:
         log.info("SMTP_APP_PASSWORD nicht gesetzt – keine Mail versendet.")
         return
-    subject = f"MySports: '{course_name}' gebucht"
-    body    = f"Der Kurs wurde erfolgreich gebucht:\n\n  {course_name}\n  {start}\n"
+
+    subject = f"✅ MySports: '{course_name}' gebucht"
+    body = f"Der Kurs wurde erfolgreich gebucht:\n\n  {course_name}\n  {start}\n"
+
+    if include_logs:
+        logs = log_stream.getvalue()
+        body += f"\n{'='*60}\nAusführungs-Logs:\n{'='*60}\n\n{logs}"
+
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
     msg["From"]    = EMAIL
@@ -156,6 +178,29 @@ def send_notification(course_name: str, start: str) -> None:
             smtp.login(EMAIL, SMTP_APP_PASS)
             smtp.send_message(msg)
         log.info("Bestaetigungs-Mail an %s gesendet.", NOTIFY_EMAIL)
+    except Exception as exc:
+        log.warning("Mail-Versand fehlgeschlagen: %s", exc)
+
+
+def send_error_notification(error_msg: str) -> None:
+    """Sendet eine Fehler-Mail mit vollständigen Logs."""
+    if not SMTP_APP_PASS:
+        log.info("SMTP_APP_PASSWORD nicht gesetzt – keine Mail versendet.")
+        return
+
+    subject = f"❌ MySports: Buchung fehlgeschlagen"
+    logs = log_stream.getvalue()
+    body = f"Die Buchung ist fehlgeschlagen:\n\n{error_msg}\n\n{'='*60}\nVollständige Logs:\n{'='*60}\n\n{logs}"
+
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"]    = EMAIL
+    msg["To"]      = NOTIFY_EMAIL
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(EMAIL, SMTP_APP_PASS)
+            smtp.send_message(msg)
+        log.info("Fehler-Mail an %s gesendet.", NOTIFY_EMAIL)
     except Exception as exc:
         log.warning("Mail-Versand fehlgeschlagen: %s", exc)
 
@@ -234,7 +279,9 @@ def main():
                     sys.exit(0)
 
                 if not should_retry:
-                    log.error("Buchung fehlgeschlagen – kein erneuter Versuch möglich.")
+                    error_msg = f"Buchung nach {attempt} Versuch(en) fehlgeschlagen (kein Retry möglich)."
+                    log.error(error_msg)
+                    send_error_notification(error_msg)
                     sys.exit(1)
 
                 # Noch nicht erfolgreich, aber Retry sinnvoll
@@ -243,11 +290,15 @@ def main():
                     time.sleep(retry_delay)
 
             # Alle Versuche aufgebraucht
-            log.error("Alle %d Versuche fehlgeschlagen.", max_attempts)
+            error_msg = f"Alle {max_attempts} Versuche fehlgeschlagen."
+            log.error(error_msg)
+            send_error_notification(error_msg)
             sys.exit(1)
 
         except Exception as e:
-            log.error("Kritischer Fehler: %s", e)
+            error_msg = f"Kritischer Fehler: {e}"
+            log.error(error_msg)
+            send_error_notification(error_msg)
             sys.exit(1)
 
 
