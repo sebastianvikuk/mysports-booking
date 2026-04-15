@@ -1,0 +1,27 @@
+name: Calisthenics Class – Mittwoch buchen
+
+on:
+  schedule:
+    - cron: '45 18 * * 3'  # Winter MEZ  (UTC+1): 19:45 MEZ = 18:45 UTC
+    - cron: '45 17 * * 3'  # Sommer MESZ (UTC+2): 19:45 MESZ = 17:45 UTC
+  workflow_dispatch:
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+    env:
+      MYSPORTS_EMAIL:    ${{ secrets.MYSPORTS_EMAIL }}
+      MYSPORTS_PASSWORD: ${{ secrets.MYSPORTS_PASSWORD }}
+      SMTP_APP_PASSWORD: ${{ secrets.SMTP_APP_PASSWORD }}
+      NOTIFY_EMAIL:      ${{ secrets.MYSPORTS_EMAIL }}
+      COURSE_NAME:       "Calisthenics Class"
+      COURSE_WEEKDAY:    "2"
+      COURSE_HOUR:       "19"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests python-dotenv
+      - name: Kurs buchen
+        run: python book.py
